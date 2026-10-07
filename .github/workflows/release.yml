@@ -1,0 +1,41 @@
+name: Build exe for release
+
+# Runs automatically when a release is published, builds KeyOverlay.exe
+# on a Windows machine and attaches it to that release.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: python -m pip install pyinstaller pillow pystray keyboard
+
+      - name: Build exe
+        run: |
+          python make_icon.py
+          python -m PyInstaller --onefile --windowed --name KeyOverlay --hidden-import=PIL._tkinter_finder --hidden-import=pystray._win32 --icon KeyOverlay.ico overlay.py
+
+      - name: Attach exe to the release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.event.release.tag_name }}" dist/KeyOverlay.exe --clobber
+
+      - name: Save exe as a build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: KeyOverlay
+          path: dist/KeyOverlay.exe
